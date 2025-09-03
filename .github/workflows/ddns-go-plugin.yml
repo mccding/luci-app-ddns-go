@@ -54,8 +54,10 @@ jobs:
         # 生成编译配置文件 .config
         run: |
           cd openwrt
-          # 写入目标平台的基本配置
-          echo "CONFIG_TARGET_${{ replace(env.TARGET_PROFILE, '/', '_') }}=y" > .config
+          # 使用 tr 命令将 env.TARGET_PROFILE 中的 '/' 替换为 '_'
+          TARGET_NAME=$(echo "${{ env.TARGET_PROFILE }}" | tr '/' '_')
+          # 使用替换后的变量生成配置
+          echo "CONFIG_TARGET_${TARGET_NAME}=y" > .config
           # 添加需要编译的插件包（luci-app-ddns-go）及其依赖（ddns-go）
           # 设置为 'm' 表示将它们编译成模块（.ipk 文件），而不是直接编译进固件
           echo "CONFIG_PACKAGE_ddns-go=m" >> .config
