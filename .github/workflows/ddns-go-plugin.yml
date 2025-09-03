@@ -51,7 +51,9 @@ jobs:
       - name: Compile the plugin
         run: |
           cd openwrt
-          # 使用 -j1 参数禁用并行编译，避免依赖竞争问题
+          # 第1步：强制编译安装所有宿主机工具，确保 libdeflate-gzip 等工具就绪
+          make tools/install -j1 V=s
+          # 第2步：编译最终的插件包
           make package/luci-app-ddns-go/compile -j1 V=s
 
       - name: Organize artifacts
