@@ -1,0 +1,102 @@
+# workflow 文件名: ddns-go-plugin.yml
+
+name: Build luci-app-ddns-go Plugin
+
+on:
+  # 允许您在 GitHub Actions 页面手动触发此工作流
+  workflow_dispatch:
+
+# 设置一些环境变量，方便后续修改
+env:
+  # 指定要编译的 ImmortalWrt 源码分支
+  IMMORTALWRT_BRANCH: openwrt-24.10.2
+  # 指定目标平台/架构 (Rockchip)
+  TARGET_PROFILE: rockchip/armv8
+  # 插件源码地址
+  PLUGIN_REPO: https://github.com/sirpdboy/luci-app-ddns-go.git
+
+jobs:
+  build:
+    # 使用最新版的 Ubuntu 虚拟机
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        # 检出当前仓库代码 (虽然此工作流不直接使用仓库内容，但这是 Actions 的标准起始步骤)
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        # 安装编译 OpenWrt/ImmortalWrt 所需的所有依赖软件包
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex g++ gawk gcc-multilib gettext \
+          git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
+          file wget
+
+      - name: Clone ImmortalWrt source code
+        # 克隆指定分支的 ImmortalWrt 源码，--depth 1 表示只克隆最新的 commit 以节省时间
+        run: git clone https://github.com/immortalwrt/immortalwrt.git -b $IMMORTALWRT_BRANCH --depth 1 openwrt
+
+      - name: Add ddns-go plugin repository
+        # 进入 openwrt 目录，并将插件的源码克隆到 package 目录下
+        run: |
+          cd openwrt
+          git clone $PLUGIN_REPO package/luci-app-ddns-go
+
+      - name: Update and install feeds
+        # 更新并安装 OpenWrt 的软件源（feeds）
+        run: |
+          cd openwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Configure the build
+        # 生成编译配置文件 .config
+        run: |
+          cd openwrt
+          # 写入目标平台的基本配置
+          echo "CONFIG_TARGET_${{ replace(env.TARGET_PROFILE, '/', '_') }}=y" > .config
+          # 添加需要编译的插件包（luci-app-ddns-go）及其依赖（ddns-go）
+          # 设置为 'm' 表示将它们编译成模块（.ipk 文件），而不是直接编译进固件
+          echo "CONFIG_PACKAGE_ddns-go=m" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ddns-go=m" >> .config
+          # 自动生成完整的 .config 文件并补全所有依赖项
+          make defconfig
+
+      - name: Compile the plugin
+        # 执行编译命令
+        run: |
+          cd openwrt
+          # 使用 -j 选项开启多线程编译以加快速度
+          # V=s 参数会输出更详细的编译过程信息，方便排查问题
+          # 单独编译 luci-app-ddns-go 会自动处理其依赖
+          make package/luci-app-ddns-go/compile -j$(nproc) V=s
+
+      - name: Organize artifacts
+        # 整理编译好的 .ipk 文件
+        id: organize
+        run: |
+          # 在 openwrt 目录外创建一个名为 artifacts 的文件夹，用于存放产物
+          mkdir -p ./artifacts
+          # 在编译输出目录中查找所有生成的 .ipk 文件，并移动到 artifacts 文件夹中
+          find ./openwrt/bin/packages -type f -name "*.ipk" -exec mv {} ./artifacts/ \;
+          # 设置一个输出变量，方便后续步骤引用 artifacts 文件夹的路径
+          echo "path=artifacts" >> $GITHUB_OUTPUT
+
+      - name: Upload IPK artifacts to release
+        # 使用 action-gh-release 插件将 .ipk 文件上传到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Release 的标签名
+          tag_name: ddns-go-plugin-autobuild
+          # Release 的标题
+          name: DDNS-GO Plugin (AutoBuild)
+          # Release 的描述内容
+          body: "自动编译的 luci-app-ddns-go 插件 for Rockchip aarch64"
+          # 需要上传的文件路径，这里引用上一步的输出
+          files: ${{ steps.organize.outputs.path }}/*.ipk
+          # 允许覆盖已存在的同名 Release，这样每次运行都会更新文件，而不是报错
+          allow_updates: true
+        env:
+          # Action 需要 GITHUB_TOKEN 才能操作 Release
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
