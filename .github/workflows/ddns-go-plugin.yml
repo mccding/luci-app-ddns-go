@@ -8,8 +8,8 @@ on:
 
 # 设置一些环境变量，方便后续修改
 env:
-  # 指定要编译的 ImmortalWrt 源码分支
-  IMMORTALWRT_BRANCH: openwrt-24.10.2
+  # 指定要编译的 ImmortalWrt 源码分支 (使用 master 获取最新开发版)
+  IMMORTALWRT_BRANCH: master
   # 指定目标平台/架构 (Rockchip)
   TARGET_PROFILE: rockchip/armv8
   # 插件源码地址
