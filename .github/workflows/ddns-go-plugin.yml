@@ -53,24 +53,24 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/immortalwrt/staging_dir
-            ~/immortalwrt/toolchain
-            ~/immortalwrt/tmp
-            ~/immortalwrt/dl
+            /home/runner/immortalwrt/staging_dir
+            /home/runner/immortalwrt/toolchain
+            /home/runner/immortalwrt/tmp
+            /home/runner/immortalwrt/dl
           key: ${{ runner.os }}-immortalwrt-${{ inputs.immortalwrt_branch_or_tag }}-${{ inputs.profile }}
 
       - name: Clone ImmortalWrt source code
         run: |
           set -e
-          if [ -d "~/immortalwrt" ]; then
+          if [ -d "/home/runner/immortalwrt" ]; then
             echo "Removing existing immortalwrt directory"
-            rm -rf ~/immortalwrt
+            rm -rf /home/runner/immortalwrt
           fi
           echo "Cloning ImmortalWrt source..."
-          git clone https://github.com/immortalwrt/immortalwrt.git -b ${{ inputs.immortalwrt_branch_or_tag }} --depth 1 ~/immortalwrt
+          git clone https://github.com/immortalwrt/immortalwrt.git -b ${{ inputs.immortalwrt_branch_or_tag }} --depth 1 /home/runner/immortalwrt
           
       - name: Setup feeds and clone custom package
-        working-directory: ~/immortalwrt
+        working-directory: /home/runner/immortalwrt
         run: |
           set -e
           # 更新默认 feeds
@@ -99,7 +99,7 @@ jobs:
           ls -l package | grep 'ddns-go'
 
       - name: Configure build target
-        working-directory: ~/immortalwrt
+        working-directory: /home/runner/immortalwrt
         run: |
           set -e
           # 创建配置文件
@@ -115,7 +115,7 @@ jobs:
           make defconfig
 
       - name: Verify configuration
-        working-directory: ~/immortalwrt
+        working-directory: /home/runner/immortalwrt
         run: |
           echo "Verifying .config file..."
           if grep -q "CONFIG_PACKAGE_ddns-go=m" .config && grep -q "CONFIG_PACKAGE_${{ inputs.package_name }}=m" .config; then
@@ -127,14 +127,14 @@ jobs:
           fi
 
       - name: Download dependencies
-        working-directory: ~/immortalwrt
+        working-directory: /home/runner/immortalwrt
         run: |
           set -e
           echo "Downloading toolchain and dependencies..."
           make download -j$(nproc)
 
       - name: Compile the packages
-        working-directory: ~/immortalwrt
+        working-directory: /home/runner/immortalwrt
         run: |
           set -e
           echo "Starting compilation... This may take a while."
@@ -150,7 +150,7 @@ jobs:
           mkdir -p /tmp/ipk_files
           
           # IPK 文件通常在 bin/packages/{arch}/base 或其他自定义 feed 目录
-          find ~/immortalwrt/bin/packages/ -type f -name "*.ipk" -exec cp {} /tmp/ipk_files/ \;
+          find /home/runner/immortalwrt/bin/packages/ -type f -name "*.ipk" -exec cp {} /tmp/ipk_files/ \;
 
           echo "Found IPK files:"
           ls -l /tmp/ipk_files/
@@ -180,3 +180,4 @@ jobs:
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
